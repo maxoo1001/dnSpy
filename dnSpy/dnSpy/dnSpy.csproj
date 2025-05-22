@@ -88,6 +88,7 @@
   <ItemGroup Condition=" '$(IsDotNetFramework)' == 'true' ">
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="PresentationFramework.Aero" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup>
