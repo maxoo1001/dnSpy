@@ -24,6 +24,8 @@ using dnSpy.Contracts.Documents.Tabs.DocViewer;
 using dnSpy.Contracts.Menus;
 using dnSpy.Contracts.Text.Editor;
 using Microsoft.VisualStudio.Text;
+using dnSpy.dnSpy.AI; // Added for IAiCodeExplainer
+using dnSpy.Contracts.Output; // Added for IOutputService
 
 namespace dnSpy.Documents.Tabs.DocViewer {
 	// Store DocumentViewer in a strong reference because it contains a IWpfTextViewHost that must
@@ -35,14 +37,26 @@ namespace dnSpy.Documents.Tabs.DocViewer {
 		readonly IDocumentViewerServiceImpl documentViewerServiceImpl;
 		readonly ITextBufferFactoryService textBufferFactoryService;
 		readonly IDsTextEditorFactoryService dsTextEditorFactoryService;
+        readonly IAiCodeExplainer aiCodeExplainer; // Added
+        readonly IOutputService outputService;     // Added
 
 		[ImportingConstructor]
-		DocumentViewerProvider(IWpfCommandService wpfCommandService, IMenuService menuService, IDocumentViewerServiceImpl documentViewerServiceImpl, ITextBufferFactoryService textBufferFactoryService, IDsTextEditorFactoryService dsTextEditorFactoryService) {
+        DocumentViewerProvider(
+            IWpfCommandService wpfCommandService, 
+            IMenuService menuService, 
+            IDocumentViewerServiceImpl documentViewerServiceImpl, 
+            ITextBufferFactoryService textBufferFactoryService, 
+            IDsTextEditorFactoryService dsTextEditorFactoryService,
+            IAiCodeExplainer aiCodeExplainer, // Added
+            IOutputService outputService      // Added
+        ) {
 			this.wpfCommandService = wpfCommandService;
 			this.menuService = menuService;
 			this.documentViewerServiceImpl = documentViewerServiceImpl;
 			this.textBufferFactoryService = textBufferFactoryService;
 			this.dsTextEditorFactoryService = dsTextEditorFactoryService;
+            this.aiCodeExplainer = aiCodeExplainer; // Added
+            this.outputService = outputService;     // Added
 		}
 
 		sealed class DocumentViewerHelper : IDocumentViewerHelper {
@@ -56,7 +70,8 @@ namespace dnSpy.Documents.Tabs.DocViewer {
 			if (typeof(T) == typeof(IDocumentViewer)) {
 				var helper = new DocumentViewerHelper();
 				var uiCtxCtrl = new DocumentViewerControl(textBufferFactoryService, dsTextEditorFactoryService, helper);
-				var uiContext = new DocumentViewer(wpfCommandService, documentViewerServiceImpl, menuService, uiCtxCtrl);
+                // Pass the new services to DocumentViewer constructor
+                var uiContext = new DocumentViewer(wpfCommandService, documentViewerServiceImpl, menuService, uiCtxCtrl, aiCodeExplainer, outputService);
 				helper.RealInstance = uiContext;
 				documentViewerServiceImpl.RaiseAddedEvent(uiContext);
 				return uiContext;

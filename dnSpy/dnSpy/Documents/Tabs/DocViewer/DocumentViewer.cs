@@ -20,7 +20,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq; // Added for FirstOrDefault
+using System.Threading; // Added for CancellationToken
 using System.Windows;
+using System.Windows.Input; // Added for ICommand related interfaces
 using dnSpy.Contracts.Controls;
 using dnSpy.Contracts.Decompiler;
 using dnSpy.Contracts.Documents.Tabs;
@@ -33,6 +36,9 @@ using dnSpy.Text.Editor;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
+using dnSpy.dnSpy.AI; // Added for IAiCodeExplainer and AiCommands
+using dnSpy.Contracts.Output; // Added for IOutputService
+// using dnSpy.Properties; // For dnSpy_Resources (if needed for errors) - Uncomment if used
 
 namespace dnSpy.Documents.Tabs.DocViewer {
 	interface IDocumentViewerHelper {
@@ -44,7 +50,13 @@ namespace dnSpy.Documents.Tabs.DocViewer {
 	sealed class DocumentViewer : DocumentTabUIContext, IDocumentViewer, IDocumentViewerHelper, IZoomable, IDisposable {
 		readonly IWpfCommandService wpfCommandService;
 		readonly IDocumentViewerServiceImpl documentViewerServiceImpl;
+		readonly IMenuService menuService; // Keep menuService for existing context menu
 		readonly DocumentViewerControl documentViewerControl;
+		readonly IAiCodeExplainer aiCodeExplainer; // Added
+		readonly IOutputService outputService;     // Added
+
+		// WORKER: Replace with a newly generated GUID - Using the one from previous thoughts: F3A4B2C1-D0E9-4F2A-8B1C-0A9E8D7C6B5A
+		private static readonly Guid AiOutputPaneGuid = new Guid("F3A4B2C1-D0E9-4F2A-8B1C-0A9E8D7C6B5A"); 
 
 		public event EventHandler<DocumentViewerGotNewContentEventArgs>? GotNewContent;
 		public event EventHandler<DocumentViewerRemovedEventArgs>? Removed;
@@ -78,23 +90,86 @@ namespace dnSpy.Documents.Tabs.DocViewer {
 			}
 		}
 
-		public DocumentViewer(IWpfCommandService wpfCommandService, IDocumentViewerServiceImpl documentViewerServiceImpl, IMenuService menuService, DocumentViewerControl documentViewerControl) {
+		public DocumentViewer(
+            IWpfCommandService wpfCommandService, 
+            IDocumentViewerServiceImpl documentViewerServiceImpl, 
+            IMenuService menuService, 
+            DocumentViewerControl documentViewerControl,
+            IAiCodeExplainer aiCodeExplainer, // Added
+            IOutputService outputService      // Added
+        ) {
 			if (menuService is null)
 				throw new ArgumentNullException(nameof(menuService));
 			this.wpfCommandService = wpfCommandService ?? throw new ArgumentNullException(nameof(wpfCommandService));
 			this.documentViewerServiceImpl = documentViewerServiceImpl ?? throw new ArgumentNullException(nameof(documentViewerServiceImpl));
 			this.documentViewerControl = documentViewerControl ?? throw new ArgumentNullException(nameof(documentViewerControl));
-			menuService.InitializeContextMenu(documentViewerControl.TextView.VisualElement, MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID, new GuidObjectsProvider(this), new ContextMenuInitializer(documentViewerControl.TextView));
+            this.aiCodeExplainer = aiCodeExplainer ?? throw new ArgumentNullException(nameof(aiCodeExplainer)); // Added
+            this.outputService = outputService ?? throw new ArgumentNullException(nameof(outputService));         // Added
+            
+            this.menuService = menuService; // Store menuService
+
+			// Initialize existing context menu
+			this.menuService.InitializeContextMenu(documentViewerControl.TextView.VisualElement, MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID, new GuidObjectsProvider(this), new ContextMenuInitializer(documentViewerControl.TextView));
 			// Prevent the tab control's context menu from popping up when right-clicking in the textview host margin
-			menuService.InitializeContextMenu(documentViewerControl, Guid.NewGuid());
+			this.menuService.InitializeContextMenu(documentViewerControl, Guid.NewGuid()); 
 			wpfCommandService.Add(ControlConstants.GUID_DOCUMENTVIEWER_UICONTEXT, documentViewerControl);
 			documentViewerControl.TextView.Properties.AddProperty(typeof(DocumentViewer), this);
 			documentViewerControl.TextView.TextBuffer.Properties.AddProperty(DocumentViewerExtensions.DocumentViewerTextBufferKey, this);
+
+            // Add CommandBinding for the new AI command
+            var explainCommandBinding = new CommandBinding(AiCommands.ExplainCodeWithAi, ExecuteExplainCodeWithAi, CanExecuteExplainCodeWithAi);
+            this.documentViewerControl.CommandBindings.Add(explainCommandBinding);
+            // Also try adding to the TextView's VisualElement if the above doesn't catch it for context menus
+            this.documentViewerControl.TextView.VisualElement.CommandBindings.Add(explainCommandBinding);
 		}
 
-		internal static DocumentViewer TryGetInstance(ITextView textView) {
-			textView.Properties.TryGetProperty(typeof(DocumentViewer), out DocumentViewer documentViewer);
-			return documentViewer;
+        private void CanExecuteExplainCodeWithAi(object sender, CanExecuteRoutedEventArgs e) {
+            // Enable if there's text in the viewer or selected text
+            e.CanExecute = documentViewerControl.TextView.TextSnapshot.Length > 0;
+            e.Handled = true;
+        }
+
+        private async void ExecuteExplainCodeWithAi(object sender, ExecutedRoutedEventArgs e) {
+            string codeToExplain = string.Empty;
+            var selection = documentViewerControl.TextView.Selection;
+
+            if (!selection.IsEmpty && selection.SelectedSpans.Any()) {
+                codeToExplain = selection.SelectedSpans.First().GetText();
+            }
+            else if (documentViewerControl.TextView.TextSnapshot.Length > 0) {
+                codeToExplain = documentViewerControl.TextView.TextSnapshot.GetText();
+            }
+
+            if (string.IsNullOrWhiteSpace(codeToExplain)) {
+                // Optionally, inform the user that there's nothing to explain
+                // Consider using IAppStatusBar or a similar notification mechanism if available.
+                return;
+            }
+
+            var outputPane = outputService.GetOrCreateTextPane(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text);
+            await outputPane.Output.WriteLineAsync($"Requesting AI explanation for code snippet (length: {codeToExplain.Length})...");
+            outputPane.Activate(); // Bring the pane to front
+
+            try {
+                string? explanation = await aiCodeExplainer.ExplainCodeAsync(codeToExplain, CancellationToken.None);
+                if (explanation != null) {
+                    await outputPane.Output.WriteLineAsync("--- Explanation ---");
+                    await outputPane.Output.WriteLineAsync(explanation);
+                    await outputPane.Output.WriteLineAsync("--- End of Explanation ---");
+                }
+                else {
+                    await outputPane.Output.WriteLineAsync("Failed to get explanation. The AI service returned no content.");
+                }
+            }
+            catch (Exception ex) {
+                await outputPane.Output.WriteLineAsync($"Error fetching AI explanation: {ex.Message}");
+                // For more detailed logs, you might write ex.ToString()
+            }
+        }
+
+		internal static DocumentViewer? TryGetInstance(ITextView textView) { // Return type made nullable
+			textView.Properties.TryGetProperty(typeof(DocumentViewer), out DocumentViewer? documentViewer); // Variable made nullable
+			return documentViewer; // Can return null
 		}
 
 		public override IInputElement? FocusedElement {
