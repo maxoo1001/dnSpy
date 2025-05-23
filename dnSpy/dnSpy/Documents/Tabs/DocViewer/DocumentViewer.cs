@@ -129,44 +129,60 @@ namespace dnSpy.Documents.Tabs.DocViewer {
             e.Handled = true;
         }
 
-        private async void ExecuteExplainCodeWithAi(object sender, ExecutedRoutedEventArgs e) {
-            string codeToExplain = string.Empty;
-            var selection = documentViewerControl.TextView.Selection;
+private async void ExecuteExplainCodeWithAi(object sender, ExecutedRoutedEventArgs e) {
+    string codeToExplain = string.Empty;
+    var selection = documentViewerControl.TextView.Selection;
 
-            if (!selection.IsEmpty && selection.SelectedSpans.Any()) {
-                codeToExplain = selection.SelectedSpans.First().GetText();
-            }
-            else if (documentViewerControl.TextView.TextSnapshot.Length > 0) {
-                codeToExplain = documentViewerControl.TextView.TextSnapshot.GetText();
-            }
+    if (!selection.IsEmpty && selection.SelectedSpans.Any()) {
+        codeToExplain = selection.SelectedSpans.First().GetText();
+    }
+    else if (documentViewerControl.TextView.TextSnapshot.Length > 0) {
+        codeToExplain = documentViewerControl.TextView.TextSnapshot.GetText();
+    }
 
-            if (string.IsNullOrWhiteSpace(codeToExplain)) {
-                // Optionally, inform the user that there's nothing to explain
-                // Consider using IAppStatusBar or a similar notification mechanism if available.
-                return;
-            }
+    if (string.IsNullOrWhiteSpace(codeToExplain)) {
+        return;
+    }
 
-            // Ensure this line uses outputService.Create
-            var outputPane = outputService.Create(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text); 
+    var outputPane = outputService.Create(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text);
+    // Select/activate the pane on the UI thread
+    outputService.Select(AiOutputPaneGuid);
+
+    // Initial message on UI thread, using the writer
+    using (var writer = outputPane.CreateWriter()) {
+        writer.WriteLine(BoxedTextColor.Text, $"Requesting AI explanation for code snippet (length: {codeToExplain.Length})...");
+        // The 'using' statement handles writer.Flush() and writer.Dispose()
+    }
+
+    // Offload the potentially long-running AI call to a background thread
+    _ = Task.Run(async () => {
+        try {
+            string? explanation = await aiCodeExplainer.ExplainCodeAsync(codeToExplain, CancellationToken.None);
             
-            await outputPane.Output.WriteLineAsync($"Requesting AI explanation for code snippet (length: {codeToExplain.Length})...");
-            outputPane.Activate(); // Bring the pane to front
-
-            try {
-                string? explanation = await aiCodeExplainer.ExplainCodeAsync(codeToExplain, CancellationToken.None);
-                if (explanation != null) {
-                    await outputPane.Output.WriteLineAsync("--- Explanation ---");
-                    await outputPane.Output.WriteLineAsync(explanation);
-                    await outputPane.Output.WriteLineAsync("--- End of Explanation ---");
+            // Switch back to UI thread to update the output pane
+            await Application.Current.Dispatcher.InvokeAsync(() => {
+                using (var writer = outputPane.CreateWriter()) { // Create writer again on UI thread for this scope
+                    if (explanation != null) {
+                        writer.WriteLine(BoxedTextColor.Text, "--- Explanation ---");
+                        writer.WriteLine(BoxedTextColor.Text, explanation);
+                        writer.WriteLine(BoxedTextColor.Text, "--- End of Explanation ---");
+                    } else {
+                        writer.WriteLine(BoxedTextColor.Error, "Failed to get explanation. The AI service returned no content.");
+                    }
+                    // The 'using' statement handles writer.Flush() and writer.Dispose()
                 }
-                else {
-                    await outputPane.Output.WriteLineAsync("Failed to get explanation. The AI service returned no content.");
-                }
-            }
-            catch (Exception ex) {
-                await outputPane.Output.WriteLineAsync($"Error fetching AI explanation: {ex.Message}");
-            }
+            });
         }
+        catch (Exception ex) {
+            // Switch back to UI thread for error reporting
+            await Application.Current.Dispatcher.InvokeAsync(() => {
+                using (var writer = outputPane.CreateWriter()) {
+                    writer.WriteLine(BoxedTextColor.Error, $"Error fetching AI explanation: {ex.Message}");
+                }
+            });
+        }
+    });
+}
 
 		internal static DocumentViewer? TryGetInstance(ITextView textView) { // Return type made nullable
 			textView.Properties.TryGetProperty(typeof(DocumentViewer), out DocumentViewer? documentViewer); // Variable made nullable
