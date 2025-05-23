@@ -42,8 +42,7 @@ namespace dnSpy.AI {
         }
 
         public override bool IsVisible(IMenuItemContext context) {
-            // Only show this in the document viewer's text editor context
-            // MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID is the context for the text view itself.
+            // Only show this in the document viewer context
             return context.CreatorObject.Guid == new Guid(MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID);
         }
 

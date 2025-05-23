@@ -146,7 +146,9 @@ namespace dnSpy.Documents.Tabs.DocViewer {
                 return;
             }
 
-            var outputPane = outputService.Create(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text);
+            // Ensure this line uses outputService.Create
+            var outputPane = outputService.Create(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text); 
+            
             await outputPane.Output.WriteLineAsync($"Requesting AI explanation for code snippet (length: {codeToExplain.Length})...");
             outputPane.Activate(); // Bring the pane to front
 
@@ -163,7 +165,6 @@ namespace dnSpy.Documents.Tabs.DocViewer {
             }
             catch (Exception ex) {
                 await outputPane.Output.WriteLineAsync($"Error fetching AI explanation: {ex.Message}");
-                // For more detailed logs, you might write ex.ToString()
             }
         }
 
