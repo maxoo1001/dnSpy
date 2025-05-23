@@ -6,7 +6,7 @@ using dnSpy.Contracts.Menus;
 using dnSpy.Contracts.Documents.Tabs.DocViewer; // Required for IDocumentViewer
 // using dnSpy.Properties; // For dnSpy_Resources if needed for header. Uncomment if dnSpy_Resources.ExplainCodeWithAiMenuHeader is defined.
 
-namespace dnSpy.dnSpy.AI {
+namespace dnSpy.AI {
     [ExportMenuItem(Header = "Explain Code with AI", Group = MenuConstants.GROUP_CTX_DOCVIEWER_EDITOR, Order = 100)]
     sealed class ExplainCodeWithAiMenuItem : MenuItemBase {
         
@@ -44,7 +44,7 @@ namespace dnSpy.dnSpy.AI {
         public override bool IsVisible(IMenuItemContext context) {
             // Only show this in the document viewer's text editor context
             // MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID is the context for the text view itself.
-            return context.CreatorObject?.Guid == new Guid(MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID);
+            return context.CreatorObject.Guid == new Guid(MenuConstants.GUIDOBJ_DOCUMENTVIEWERCONTROL_GUID);
         }
 
         // Optionally, if you want the header to be dynamic or come from resources:

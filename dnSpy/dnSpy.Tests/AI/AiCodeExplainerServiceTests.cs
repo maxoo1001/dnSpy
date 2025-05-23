@@ -1,10 +1,10 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using dnSpy.dnSpy.AI; // Make sure this using directive can resolve
+using dnSpy.AI; // Changed from dnSpy.dnSpy.AI
 using System.Threading;
 using System.Threading.Tasks;
 using System;
 
-namespace dnSpy.dnSpy.Tests.AI { // Adjust namespace to match test project structure
+namespace dnSpy.Tests.AI { // Changed from dnSpy.dnSpy.Tests.AI
     [TestClass]
     public class AiCodeExplainerServiceTests {
         private const string TestApiKeyEnvVar = "DNSPY_AI_API_KEY";

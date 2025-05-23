@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 // using dnSpy.Contracts.App; // Example: For IAppStatusbar (optional for now)
 // using Newtonsoft.Json; // Example: If you were to use Newtonsoft.Json
 
-namespace dnSpy.dnSpy.AI {
+namespace dnSpy.AI {
     [Export(typeof(IAiCodeExplainer))]
     public class AiCodeExplainerService : IAiCodeExplainer {
         private const string ApiKeyEnvVar = "DNSPY_AI_API_KEY";

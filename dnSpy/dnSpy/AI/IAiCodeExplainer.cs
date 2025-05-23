@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace dnSpy.dnSpy.AI {
+namespace dnSpy.AI {
     /// <summary>
     /// Service for interacting with an AI model to explain code.
     /// </summary>

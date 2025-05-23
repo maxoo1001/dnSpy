@@ -36,7 +36,7 @@ using dnSpy.Text.Editor;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
-using dnSpy.dnSpy.AI; // Added for IAiCodeExplainer and AiCommands
+using dnSpy.AI; // Changed from dnSpy.dnSpy.AI
 using dnSpy.Contracts.Output; // Added for IOutputService
 // using dnSpy.Properties; // For dnSpy_Resources (if needed for errors) - Uncomment if used
 
@@ -146,7 +146,7 @@ namespace dnSpy.Documents.Tabs.DocViewer {
                 return;
             }
 
-            var outputPane = outputService.GetOrCreateTextPane(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text);
+            var outputPane = outputService.Create(AiOutputPaneGuid, "AI Code Explanations", ContentTypes.Text);
             await outputPane.Output.WriteLineAsync($"Requesting AI explanation for code snippet (length: {codeToExplain.Length})...");
             outputPane.Activate(); // Bring the pane to front
 

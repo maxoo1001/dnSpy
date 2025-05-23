@@ -24,7 +24,7 @@ using dnSpy.Contracts.Documents.Tabs.DocViewer;
 using dnSpy.Contracts.Menus;
 using dnSpy.Contracts.Text.Editor;
 using Microsoft.VisualStudio.Text;
-using dnSpy.dnSpy.AI; // Added for IAiCodeExplainer
+using dnSpy.AI; // Changed from dnSpy.dnSpy.AI
 using dnSpy.Contracts.Output; // Added for IOutputService
 
 namespace dnSpy.Documents.Tabs.DocViewer {
